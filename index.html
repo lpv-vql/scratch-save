@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>セーブコード保存</title>
+  <style>
+    body {
+      background: #fff;
+      color: #000;
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    h1 {
+      font-size: 1.5em;
+    }
+    input[type='text'], textarea {
+      padding: 8px 12px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      width: 100%;
+      box-sizing: border-box;
+      transition: 0.2s;
+    }
+    input[type='text']:focus, textarea:focus {
+      border-color: #000;
+      outline: none;
+    }
+    #search {
+      font-size: 14px;
+      width: 150px;
+      box-sizing: border-box;
+    }
+    button {
+      background: #fff;
+      color: #000;
+      border: none;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:active {
+      opacity: 0.7;
+    }
+    #addBtn {
+      background: #000;
+      color: #fff;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      font-size: 24px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: bold;
+      padding: 0;
+      margin-left: 10px;
+    }
+    #formModal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.4);
+      justify-content: center;
+      align-items: center;
+    }
+    #formContent {
+      background: #fff;
+      padding: 20px;
+      width: 450px;
+      box-sizing: border-box;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+    #saveList {
+      margin-top: 20px;
+    }
+    .item {
+      border-bottom: 1px solid #ddd;
+      padding: 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .thumb {
+      width: 100px;
+      height: 75px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .info {
+      flex: 1;
+    }
+    .info a {
+      color: #000;
+      text-decoration: none;
+    }
+    .info a:hover {
+      text-decoration: underline;
+    }
+    .code {
+      font-size: 16px;
+      font-family: monospace;
+      background: #f5f5f5;
+      padding: 4px;
+      display: inline-block;
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    .copyBtn {
+      margin-left: 5px;
+      font-size: 12px;
+    }
+    .copiedMsg {
+      margin-left: 5px;
+      font-size: 12px;
+      color: green;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>scratch セーブコード保存</h1>
+  <p>by <a href="https://scratch.mit.edu/users/lpv_vql/">lpv_vql</a></p>
+  <p>同じデバイスかつ同じブラウザであれば保存されます。</p></br>
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+    <input type="text" id="search" placeholder="題名で検索">
+    <button id="addBtn">＋</button>
+  </div>
+
+  <div id="formModal">
+    <div id="formContent">
+      <h2>新しく保存</h2>
+      <label>題名(任意): <input type="text" id="titleInput"></label><br><br>
+      <label>作品URL(任意): <input type="text" id="urlInput"></label><br><br>
+      <label>セーブコード:<br>
+        <textarea id="codeInput" rows="8"></textarea>
+      </label><br><br>
+      <button id="saveBtn">保存</button>
+      <button id="cancelBtn">キャンセル</button>
+    </div>
+  </div>
+
+  <div id="saveList"></div>
+
+  <script>
+    const addBtn = document.getElementById('addBtn');
+    const formModal = document.getElementById('formModal');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const saveList = document.getElementById('saveList');
+    const search = document.getElementById('search');
+
+    const titleInput = document.getElementById('titleInput');
+    const urlInput = document.getElementById('urlInput');
+    const codeInput = document.getElementById('codeInput');
+
+    function getSaves() {
+      return JSON.parse(localStorage.getItem('saves') || '[]');
+    }
+    function setSaves(saves) {
+      localStorage.setItem('saves', JSON.stringify(saves));
+    }
+
+    function render() {
+      const saves = getSaves();
+      const q = search.value.toLowerCase();
+      saveList.innerHTML = '';
+      saves
+        .filter(s => (s.title || '').toLowerCase().includes(q))
+        .sort((a,b) => new Date(b.date)-new Date(a.date))
+        .forEach((s) => {
+          const div = document.createElement('div');
+          div.className = 'item';
+
+          if (s.url) {
+            const thumbLink = document.createElement('a');
+            thumbLink.href = s.url;
+            thumbLink.target = '_blank';
+            const thumb = document.createElement('img');
+            thumb.className = 'thumb';
+            thumb.src = `https://uploads.scratch.mit.edu/get_image/project/${s.url.split('/').filter(x=>x).pop()}_100x80.png`;
+            thumbLink.appendChild(thumb);
+            div.appendChild(thumbLink);
+          } else {
+            const thumb = document.createElement('img');
+            thumb.className = 'thumb';
+            thumb.src = '';
+            div.appendChild(thumb);
+          }
+
+          const info = document.createElement('div');
+          info.className = 'info';
+          if (s.title && s.title.trim() !== '') {
+            if (s.url) {
+              info.innerHTML = `<strong><a href="${s.url}" target="_blank">${s.title}</a></strong><br>${s.date}`;
+            } else {
+              info.innerHTML = `<strong>${s.title}</strong><br>${s.date}`;
+            }
+          } else {
+            info.innerHTML = `${s.date}`;
+          }
+
+          const codeSpan = document.createElement('span');
+          codeSpan.className = 'code';
+          codeSpan.textContent = s.code;
+
+          const copyBtn = document.createElement('button');
+          copyBtn.className = 'copyBtn';
+          copyBtn.textContent = 'コピー';
+
+          const copiedMsg = document.createElement('span');
+          copiedMsg.className = 'copiedMsg';
+          copiedMsg.textContent = 'コピーしました';
+
+          copyBtn.addEventListener('click', () => {
+            try {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(s.code).then(() => {
+                  copiedMsg.style.display = 'inline';
+                  setTimeout(()=>copiedMsg.style.display='none',2000);
+                }).catch(() => fallbackCopy());
+              } else {
+                fallbackCopy();
+              }
+            } catch(e) {
+              fallbackCopy();
+            }
+
+            function fallbackCopy() {
+              const temp = document.createElement('textarea');
+              temp.value = s.code;
+              document.body.appendChild(temp);
+              temp.select();
+              try {
+                document.execCommand('copy');
+                copiedMsg.style.display = 'inline';
+                setTimeout(()=>copiedMsg.style.display='none',2000);
+              } catch(err) {
+                alert('コピーに失敗しました。ブラウザの設定を確認してください。');
+              }
+              document.body.removeChild(temp);
+            }
+          });
+
+          const delBtn = document.createElement('button');
+          delBtn.textContent = '削除';
+          delBtn.onclick = () => {
+            let saves = getSaves();
+            saves = saves.filter(item => item.id !== s.id);
+            setSaves(saves);
+            render();
+          };
+
+          div.appendChild(info);
+          div.appendChild(codeSpan);
+          div.appendChild(copyBtn);
+          div.appendChild(copiedMsg);
+          div.appendChild(delBtn);
+          saveList.appendChild(div);
+        });
+    }
+
+    addBtn.onclick = () => {
+      titleInput.value = '';
+      urlInput.value = '';
+      codeInput.value = '';
+      formModal.style.display = 'flex';
+    };
+    cancelBtn.onclick = () => { formModal.style.display = 'none'; };
+
+    saveBtn.onclick = () => {
+      const title = titleInput.value.trim();
+      const url = urlInput.value.trim();
+      const code = codeInput.value.trim();
+      if (!code) return alert('セーブコードを入力してください');
+
+      const saves = getSaves();
+      saves.push({id: Date.now(), title, url, code, date: new Date().toLocaleString()});
+      setSaves(saves);
+
+      titleInput.value = '';
+      urlInput.value = '';
+      codeInput.value = '';
+      formModal.style.display = 'none';
+
+      render();
+    };
+
+    search.oninput = render;
+    render();
+  </script>
+</body>
+</html>
